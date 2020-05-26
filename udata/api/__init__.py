@@ -4,11 +4,13 @@ import urllib.parse
 
 from functools import wraps
 
+from werkzeug.exceptions import NotFound, Unauthorized
 from flask import (
     current_app, g, request, url_for, json, make_response, redirect, Blueprint
 )
 from flask_fs import UnauthorizedFileType
 from flask_restplus import Api, Resource, cors
+from flask_cors import CORS
 
 from udata import tracking, theme
 from udata.app import csrf
@@ -26,6 +28,7 @@ from .signals import on_api_call
 log = logging.getLogger(__name__)
 
 apiv1 = Blueprint('api', __name__, url_prefix='/api/1')
+apiv2 = Blueprint('api2', __name__, url_prefix='/api/2')
 apidoc = I18nBlueprint('apidoc', __name__)
 
 DEFAULT_PAGE_SIZE = 50
@@ -60,6 +63,8 @@ PREFLIGHT_HEADERS = (
     'X-Forwarded-Port',
     'X-Forwarded-Proto',
 )
+
+co = CORS(allow_headers=PREFLIGHT_HEADERS)
 
 
 class UDataApi(Api):
@@ -165,12 +170,7 @@ class UDataApi(Api):
 
 api = UDataApi(
     apiv1,
-    decorators=[csrf.exempt,
-                cors.crossdomain(origin='*',
-                                 credentials=True,
-                                 headers=PREFLIGHT_HEADERS
-                )
-    ],
+    decorators=[csrf.exempt],
     version='1.0', title='uData API',
     description='uData API', default='site',
     default_label='Site global namespace'
@@ -323,5 +323,7 @@ def init_app(app):
     # api.init_app(app)
     app.register_blueprint(apidoc)
     app.register_blueprint(apiv1)
+    app.register_blueprint(apiv2)
 
     oauth2.init_app(app)
+    co.init_app(app)
