@@ -28,23 +28,22 @@ both tmpfs based and your tests will make use of it and run faster.
 
 ## Backend unit tests
 
-The easiest way is to run Python tests with [nosetest][].
+The easiest way is to run Python tests with [pytest][].
 
 ```shell
-$ nosetests --immediate udata
+$ pytest # In Udata base directory
 ```
 
-You can launch a unique test too:
+You can launch a unique file:
 
 ```shell
-$ nosetests --immediate --stop --tests=udata/tests/api/test_datasets_api.py:DatasetResourceAPITest.test_reorder
+$ pytest udata/tests/api/test_datasets_api.py
 ```
 
-If you want a fancy display, you can use the [nose-mocha-reporter][] (not installed by default)
-with the dedicated option:
+Or a unique test too:
 
 ```shell
-$ nosetests --with-mocha-reporter --immediate --stop --tests=udata/tests/api/test_datasets_api.py:DatasetResourceAPITest
+$ pytest udata/tests/api/test_datasets_api.py -k test_community_resource_api_create
 ```
 
 ## Frontend unit tests
@@ -148,8 +147,7 @@ $ watai specs/integration/  --config '{"ignore":[1,2,3,5,6,7], "email":"name@exa
 
 Check out the [Watai tutorial][] to add your own tests!
 
-[nosetest]: https://nose.readthedocs.org/en/latest/
-[nose-mocha-reporter]: https://pypi.org/project/nose-mocha-reporter
+[pytest]: https://docs.pytest.org/en/latest/
 [watai]: https://github.com/MattiSG/Watai
 [webdriver api]: https://github.com/admc/wd/blob/master/doc/api.md
 [selenium]: http://docs.seleniumhq.org/
