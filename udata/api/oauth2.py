@@ -15,18 +15,19 @@ As well as a sample application:
 '''
 
 from bson import ObjectId
+import ast
 
 from datetime import datetime, timedelta
 
 from authlib.integrations.flask_oauth2.errors import _HTTPException as AuthlibFlaskException
 from authlib.integrations.flask_oauth2 import AuthorizationServer, ResourceProtector
-from authlib.oauth2.rfc6749 import grants, ClientMixin
+from authlib.oauth2.rfc6749 import grants, ClientMixin, OAuth2Request
 from authlib.oauth2.rfc6750 import BearerTokenValidator
 from authlib.oauth2.rfc7009 import RevocationEndpoint
 from authlib.oauth2.rfc7636 import CodeChallenge
 from authlib.oauth2.rfc6749.util import scope_to_list, list_to_scope
 from authlib.oauth2 import OAuth2Error
-from flask import request
+from flask import request, jsonify
 from flask_security.utils import verify_password
 from werkzeug.exceptions import Unauthorized
 from werkzeug.security import gen_salt
@@ -39,12 +40,13 @@ from udata.models import db
 from udata.core.user.models import User
 from udata.core.storages import images, default_image_basename
 
+from .helpers import create_oauth_request, handle_response
+
 import logging
 log = logging.getLogger(__name__)
 
+
 blueprint = I18nBlueprint('oauth', __name__, url_prefix='/oauth')
-oauth = AuthorizationServer()
-require_oauth = ResourceProtector()
 
 
 GRANT_EXPIRATION = 100  # 100 seconds
@@ -61,6 +63,9 @@ SCOPES = {
     'admin': _('System administrator rights')
 }
 
+oauth = AuthorizationServer()
+require_oauth = ResourceProtector()
+
 
 class OAuth2Client(ClientMixin, db.Datetimed, db.Document):
     secret = db.StringField(default=lambda: gen_salt(50))
@@ -73,8 +78,10 @@ class OAuth2Client(ClientMixin, db.Datetimed, db.Document):
     image = db.ImageField(fs=images, basename=default_image_basename,
                           thumbnails=[150, 25])
 
+    grant_types = db.ListField(db.StringField())
+    response_types = db.ListField(db.StringField())
     redirect_uris = db.ListField(db.StringField())
-    scope = db.StringField(default='')
+    scope = db.StringField(default='default')
 
     confidential = db.BooleanField(default=False)
     internal = db.BooleanField(default=False)
@@ -124,6 +131,7 @@ class OAuth2Client(ClientMixin, db.Datetimed, db.Document):
         return True
 
     def check_grant_type(self, grant_type):
+        # return grant_type in self.grant_types
         return True
 
     def check_requested_scope(self, scope):
@@ -181,6 +189,7 @@ class OAuth2Code(db.Document):
 
     code = db.StringField(required=True)
 
+    # grant_type = db.StringField()
     redirect_uri = db.StringField()
     expires = db.DateTimeField()
 
@@ -212,6 +221,7 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
     ]
 
     def save_authorization_code(self, code, request):
+        print(f'--- save_authorization_code > request : \n{request.__dict__}')
         code_challenge = request.data.get('code_challenge')
         code_challenge_method = request.data.get('code_challenge_method')
         expires = datetime.utcnow() + timedelta(seconds=GRANT_EXPIRATION)
@@ -289,12 +299,21 @@ class BearerToken(BearerTokenValidator):
 
 @blueprint.route('/token', methods=['POST'], localize=False, endpoint='token')
 @csrf.exempt
-def access_token(*args, **kwargs):
+def access_token():
     log.info(f'\n>>> access_token > POST : ')
     log.info(f'>>> access_token > request : ')
     log.info(request.__dict__)
-    return oauth.create_token_response(request=request)
-
+    req = create_oauth_request(request, OAuth2Request)
+    resp = oauth.create_token_response(request=req)
+    log.info(f'>>> access_token > resp : \n{resp.__dict__}')
+    log.info(f'>>> access_token > resp.response : \n{resp.response}')
+    dict_str = resp.response[0].decode("UTF-8")
+    log.info(f'>>> access_token > dict_str : \n{dict_str}')
+    respDict = ast.literal_eval(dict_str)
+    log.info(f'>>> access_token > respDict : \n{respDict}')
+    respHandled = handle_response(200, respDict, resp.headers)
+    log.info(f'>>> access_token > respHandled : \n{respHandled.__dict__}')
+    return respHandled
 
 @blueprint.route('/revoke', methods=['POST'], localize=False)
 @csrf.exempt
@@ -323,6 +342,8 @@ def authorize(*args, **kwargs):
         accept = 'accept' in request.form
         decline = 'decline' in request.form
         if accept and not decline:
+            print(f'>>> authorize > current_user.get_id() : {current_user.get_id()}')
+            print(f'>>> authorize > current_user.first_name : {current_user.first_name}')
             grant_user = current_user
         else:
             grant_user = None
@@ -341,6 +362,8 @@ def query_client(client_id):
 
 
 def save_token(token, request):
+    print(f'\n>>> save_token > token : \n{token}')
+    print(f'\n>>> save_token > request : \n{request.__dict__}')
     scope = token.pop('scope', '')
     if request.grant_type == 'refresh_token':
         credential = request.credential

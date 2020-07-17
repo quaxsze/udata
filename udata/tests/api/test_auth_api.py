@@ -303,7 +303,7 @@ class APIAuthTest:
         code_challenge = create_s256_code_challenge(code_verifier)
         log.info(f'code_verifier : {code_verifier}')
         log.info(f'code_challenge : {code_challenge}')
-        log.info(f'client : {client.__dict__}')
+        log.info(f'client : \n{client.__dict__}')
 
         client.login()
 
