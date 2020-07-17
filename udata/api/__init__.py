@@ -75,13 +75,19 @@ class UDataApi(Api):
                 'type': 'apiKey',
                 'in': 'header',
                 'name': HEADER_API_KEY
-            }
+            },
+            # 'authorization': {
+            #     'type': 'Bearer',
+            #     'in': 'header',
+            #     'name':'Authorization'
+            # }
         }
 
     def secure(self, func):
         '''Enforce authentication on a given method/verb
         and optionally check a given permission
         '''
+        print(f'\n>>> secure > ...  ')
         if isinstance(func, str):
             return self._apply_permission(Permission(RoleNeed(func)))
         elif isinstance(func, Permission):
@@ -90,6 +96,7 @@ class UDataApi(Api):
             return self._apply_secure(func)
 
     def _apply_permission(self, permission):
+        print(f'\n>>> _apply_permission > ...  ')
         def wrapper(func):
             return self._apply_secure(func, permission)
         return wrapper
@@ -97,6 +104,8 @@ class UDataApi(Api):
     def _apply_secure(self, func, permission=None):
         '''Enforce authentication on a given method/verb'''
         self._build_doc(func, {'security': 'apikey'})
+
+        print(f'\n>>> _apply_secure > ...  ')
 
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -116,12 +125,15 @@ class UDataApi(Api):
 
     def authentify(self, func):
         '''Authentify the user if credentials are given'''
+        print(f'>>> authentify > ...  ')
         @wraps(func)
         def wrapper(*args, **kwargs):
             if current_user.is_authenticated:
                 return func(*args, **kwargs)
 
+            print(f'>>> authentify > request : ', request.__dict__)
             apikey = request.headers.get(HEADER_API_KEY)
+            authorization = request.headers.get('Authorization')
             if apikey:
                 try:
                     user = User.objects.get(apikey=apikey)
@@ -131,6 +143,7 @@ class UDataApi(Api):
                 if not login_user(user, False):
                     self.abort(401, 'Inactive user')
             else:
+                print(f'>>> authentify > authorization : ', authorization)
                 oauth2.check_credentials()
             return func(*args, **kwargs)
         return wrapper

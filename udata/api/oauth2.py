@@ -40,7 +40,7 @@ from udata.models import db
 from udata.core.user.models import User
 from udata.core.storages import images, default_image_basename
 
-from .helpers import create_oauth_request, handle_response
+from authlib.integrations.flask_helpers import create_oauth_request
 
 import logging
 log = logging.getLogger(__name__)
@@ -297,23 +297,17 @@ class BearerToken(BearerTokenValidator):
         return token.revoked
 
 
+### cf https://ns1.ibsinternet.com/powerdns-admin/flask/lib/python3.4/site-packages/authlib/flask/client/oauth.py
+
 @blueprint.route('/token', methods=['POST'], localize=False, endpoint='token')
 @csrf.exempt
 def access_token():
     log.info(f'\n>>> access_token > POST : ')
     log.info(f'>>> access_token > request : ')
     log.info(request.__dict__)
-    req = create_oauth_request(request, OAuth2Request)
+    req = create_oauth_request(request, OAuth2Request, use_json=True)
     resp = oauth.create_token_response(request=req)
-    log.info(f'>>> access_token > resp : \n{resp.__dict__}')
-    log.info(f'>>> access_token > resp.response : \n{resp.response}')
-    dict_str = resp.response[0].decode("UTF-8")
-    log.info(f'>>> access_token > dict_str : \n{dict_str}')
-    respDict = ast.literal_eval(dict_str)
-    log.info(f'>>> access_token > respDict : \n{respDict}')
-    respHandled = handle_response(200, respDict, resp.headers)
-    log.info(f'>>> access_token > respHandled : \n{respHandled.__dict__}')
-    return respHandled
+    return resp
 
 @blueprint.route('/revoke', methods=['POST'], localize=False)
 @csrf.exempt
@@ -380,8 +374,10 @@ def save_token(token, request):
 
 
 def check_credentials():
+    print(f'\n>>> check_credentials > ...')
     try:
         with require_oauth.acquire() as token:
+            print(f'\n>>> check_credentials > token : {token}')
             login_user(token.user)
         return True
     except (Unauthorized, AuthlibFlaskException):
