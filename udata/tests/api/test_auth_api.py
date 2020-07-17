@@ -22,6 +22,9 @@ from udata.tests.helpers import (
 
 ns = api.namespace('fake', 'A Fake namespace')
 
+import logging
+log = logging.getLogger(__name__)
+
 
 class FakeForm(Form):
     required = fields.StringField(validators=[validators.DataRequired()])
@@ -298,6 +301,9 @@ class APIAuthTest:
     def test_s256_code_challenge_success_client_secret_post(self, client, oauth):
         code_verifier = generate_token(48)
         code_challenge = create_s256_code_challenge(code_verifier)
+        log.info(f'code_verifier : {code_verifier}')
+        log.info(f'code_challenge : {code_challenge}')
+        log.info(f'client : {client.__dict__}')
 
         client.login()
 
@@ -323,6 +329,9 @@ class APIAuthTest:
             'client_id': oauth.client_id,
             'client_secret': oauth.secret
         })
+
+        log.info(f'response : \n{response.__dict__}')
+        log.info(f'response.json : \n{response.json}')
 
         assert200(response)
         assert response.content_type == 'application/json'

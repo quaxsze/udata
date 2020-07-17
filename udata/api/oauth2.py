@@ -39,6 +39,8 @@ from udata.models import db
 from udata.core.user.models import User
 from udata.core.storages import images, default_image_basename
 
+import logging
+log = logging.getLogger(__name__)
 
 blueprint = I18nBlueprint('oauth', __name__, url_prefix='/oauth')
 oauth = AuthorizationServer()
@@ -287,8 +289,11 @@ class BearerToken(BearerTokenValidator):
 
 @blueprint.route('/token', methods=['POST'], localize=False, endpoint='token')
 @csrf.exempt
-def access_token():
-    return oauth.create_token_response()
+def access_token(*args, **kwargs):
+    log.info(f'\n>>> access_token > POST : ')
+    log.info(f'>>> access_token > request : ')
+    log.info(request.__dict__)
+    return oauth.create_token_response(request=request)
 
 
 @blueprint.route('/revoke', methods=['POST'], localize=False)
@@ -300,23 +305,29 @@ def revoke_token():
 @blueprint.route('/authorize', methods=['GET', 'POST'])
 @login_required
 def authorize(*args, **kwargs):
+    print(f'\n>>> authorize > request : ')
+    print(request.__dict__)
     if request.method == 'GET':
+        print(f'>>> authorize > GET : ')
         try:
             grant = oauth.validate_consent_request(end_user=current_user)
         except OAuth2Error as error:
             return error.error
         # Bypass authorization screen for internal clients
         if grant.client.internal:
-            return oauth.create_authorization_response(grant_user=current_user)
+            return oauth.create_authorization_response(request=request, grant_user=current_user)
+        print(f'>>> authorize > grant : {grant}')
         return theme.render('api/oauth_authorize.html', grant=grant)
     elif request.method == 'POST':
+        print(f'>>> authorize > POST : ')
         accept = 'accept' in request.form
         decline = 'decline' in request.form
         if accept and not decline:
             grant_user = current_user
         else:
             grant_user = None
-        return oauth.create_authorization_response(grant_user=grant_user)
+        print(f'>>> authorize > grant_user : {grant_user}')
+        return oauth.create_authorization_response(request=request, grant_user=grant_user)
 
 
 @blueprint.route('/error')
